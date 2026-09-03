@@ -67,10 +67,10 @@ async def _process_message(raw: str) -> None:
     }))
 
     if action == "test_storage":
-        await write_hello(tier, resource_code, tenant_id)
+        await write_hello(tier, resource_code)
         log.info(json.dumps({
-            "event":     "hello_txt_written",
-            "tenant_id": tenant_id,
+            "event":         "hello_txt_written",
+            "resource_code": resource_code,
         }))
     else:
         log.warning(json.dumps({

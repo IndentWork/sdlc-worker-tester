@@ -20,14 +20,14 @@ def _account_url(tier: str, resource_code: str) -> str:
     return f"https://{name}.blob.core.windows.net"
 
 
-async def write_hello(tier: str, resource_code: str, tenant_id: str) -> None:
-    """Write hello.txt to the configs container for the given tenant."""
+async def write_hello(tier: str, resource_code: str) -> None:
+    """Write hello.txt to configs/{resource_code}/hello.txt in the tenant's Storage account."""
     url = _account_url(tier, resource_code)
     credential = DefaultAzureCredential()
 
     async with BlobServiceClient(url, credential) as client:
         container = client.get_container_client("configs")
-        blob = container.get_blob_client(f"{tenant_id}/hello.txt")
+        blob = container.get_blob_client(f"{resource_code}/hello.txt")
         await blob.upload_blob(
             b"Hello from sdlc-worker-tester!",
             overwrite=True,
