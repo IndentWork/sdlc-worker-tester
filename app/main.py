@@ -45,7 +45,7 @@ log = _setup_logging()
 from azure.identity.aio import DefaultAzureCredential
 from azure.servicebus.aio import ServiceBusClient
 
-from app.services.storage import write_hello
+from app.services.storage import write_hello, write_sdlc_yml
 
 QUEUE_NAME = "repo-index"
 
@@ -72,6 +72,16 @@ async def _process_message(raw: str) -> None:
             "event":         "hello_txt_written",
             "resource_code": resource_code,
         }))
+
+    elif action == "upload_sdlc":
+        content = payload.get("content", "")
+        await write_sdlc_yml(tier, resource_code, content)
+        log.info(json.dumps({
+            "event":         "sdlc_yml_saved",
+            "resource_code": resource_code,
+            "path":          f"configs/{resource_code}/sdlc.yml",
+        }))
+
     else:
         log.warning(json.dumps({
             "event":  "unknown_action",

@@ -32,3 +32,18 @@ async def write_hello(tier: str, resource_code: str) -> None:
             b"Hello from sdlc-worker-tester!",
             overwrite=True,
         )
+
+
+async def write_sdlc_yml(tier: str, resource_code: str, content: str) -> None:
+    """Save raw YAML content to configs/{resource_code}/sdlc.yml in the tenant's Storage account."""
+    url = _account_url(tier, resource_code)
+    credential = DefaultAzureCredential()
+
+    async with BlobServiceClient(url, credential) as client:
+        container = client.get_container_client("configs")
+        blob = container.get_blob_client(f"{resource_code}/sdlc.yml")
+        await blob.upload_blob(
+            content.encode("utf-8"),
+            overwrite=True,
+            content_type="application/x-yaml",
+        )
