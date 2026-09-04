@@ -1,7 +1,8 @@
 """
 Tester worker — listens to the tester subscription on sdlc-events topic.
 
-Processes test actions:
+Creates the tester subscription on first run with SQL filter for test actions.
+Processes test messages:
 - action=test_storage: writes hello.txt to tenant's Storage configs container
 - action=upload_sdlc: saves raw YAML to configs/{resource_code}/sdlc.yml
 
@@ -94,7 +95,8 @@ async def _process_message(raw: str) -> None:
 
 async def listen() -> None:
     """
-    Long-running loop — receives messages from tester subscription one at a time.
+    Long-running loop — receives messages from tester subscription.
+    Creates the subscription on first run with SQL filter if it doesn't exist.
     Completes the message on success so it is removed from the subscription.
     Abandons on failure so it returns to the subscription for retry.
     """
@@ -109,6 +111,28 @@ async def listen() -> None:
     }))
 
     async with ServiceBusClient(namespace, credential) as client:
+        # Create subscription on first run with SQL filter
+        # If subscription already exists, this is a no-op (exists_ok=True)
+        try:
+            await client.create_subscription(
+                TOPIC_NAME,
+                SUBSCRIPTION_NAME,
+                sql_filter="action = 'test_storage' OR action = 'upload_sdlc'",
+                exists_ok=True
+            )
+            log.info(json.dumps({
+                "event": "subscription_created_or_exists",
+                "subscription": SUBSCRIPTION_NAME,
+                "filter": "action = 'test_storage' OR action = 'upload_sdlc'"
+            }))
+        except Exception as exc:
+            log.warning(json.dumps({
+                "event": "subscription_creation_warning",
+                "error": str(exc),
+                "type": type(exc).__name__,
+            }))
+
+        # Listen for messages on the subscription
         async with client.get_subscription_receiver(TOPIC_NAME, SUBSCRIPTION_NAME) as receiver:
             async for message in receiver:
                 try:
