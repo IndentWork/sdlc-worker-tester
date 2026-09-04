@@ -1,8 +1,12 @@
 """
-Tester worker — listens to the repo-index Service Bus queue and processes test messages.
+Tester worker — listens to the tester subscription on sdlc-events topic.
 
-For action=test_storage: writes hello.txt to the tenant's Storage configs container.
-This validates the full end-to-end path: Service Bus → worker → Storage.
+Processes test actions:
+- action=test_storage: writes hello.txt to tenant's Storage configs container
+- action=upload_sdlc: saves raw YAML to configs/{resource_code}/sdlc.yml
+
+Service Bus routes messages via SQL filter on the action application property.
+This validates the full end-to-end path: Topic → Subscription → Worker → Storage.
 
 Environment variables required:
   SERVICEBUS_NAMESPACE  — e.g. sb-sdlc-shared-dev.servicebus.windows.net
@@ -47,21 +51,20 @@ from azure.servicebus.aio import ServiceBusClient
 
 from app.services.storage import write_hello, write_sdlc_yml
 
-QUEUE_NAME = "repo-index"
+TOPIC_NAME = "sdlc-events"
+SUBSCRIPTION_NAME = "tester"
 
 
 async def _process_message(raw: str) -> None:
     """Dispatch a single message to the correct handler based on action field."""
     payload = json.loads(raw)
     action      = payload.get("action")
-    tenant_id   = payload.get("tenant_id")
-    tier        = payload.get("tier")
     resource_code = payload.get("resource_code")
+    tier        = payload.get("tier")
 
     log.info(json.dumps({
         "event":         "message_received",
         "action":        action,
-        "tenant_id":     tenant_id,
         "tier":          tier,
         "resource_code": resource_code,
     }))
@@ -91,21 +94,22 @@ async def _process_message(raw: str) -> None:
 
 async def listen() -> None:
     """
-    Long-running loop — receives messages from repo-index queue one at a time.
-    Completes the message on success so it is removed from the queue.
-    Abandons on failure so it returns to the queue for retry.
+    Long-running loop — receives messages from tester subscription one at a time.
+    Completes the message on success so it is removed from the subscription.
+    Abandons on failure so it returns to the subscription for retry.
     """
     namespace = os.environ["SERVICEBUS_NAMESPACE"]
     credential = DefaultAzureCredential()
 
     log.info(json.dumps({
-        "event":     "worker_started",
-        "namespace": namespace,
-        "queue":     QUEUE_NAME,
+        "event":          "worker_started",
+        "namespace":      namespace,
+        "topic":          TOPIC_NAME,
+        "subscription":   SUBSCRIPTION_NAME,
     }))
 
     async with ServiceBusClient(namespace, credential) as client:
-        async with client.get_queue_receiver(QUEUE_NAME) as receiver:
+        async with client.get_subscription_receiver(TOPIC_NAME, SUBSCRIPTION_NAME) as receiver:
             async for message in receiver:
                 try:
                     await _process_message(str(message))
