@@ -59,9 +59,10 @@ SUBSCRIPTION_NAME = "tester"
 async def _process_message(raw: str) -> None:
     """Dispatch a single message to the correct handler based on action field."""
     payload = json.loads(raw)
-    action      = payload.get("action")
+    action        = payload.get("action")
     resource_code = payload.get("resource_code")
-    tier        = payload.get("tier")
+    github_org    = payload.get("github_org", "")
+    tier          = payload.get("tier")
 
     log.info(json.dumps({
         "event":         "message_received",
@@ -71,19 +72,20 @@ async def _process_message(raw: str) -> None:
     }))
 
     if action == "test_storage":
-        await write_hello(tier, resource_code)
+        await write_hello(tier, resource_code, github_org)
         log.info(json.dumps({
             "event":         "hello_txt_written",
             "resource_code": resource_code,
+            "path":          f"sdlc/{resource_code}/{github_org}/hello.txt",
         }))
 
     elif action == "upload_sdlc":
         content = payload.get("content", "")
-        await write_sdlc_yml(tier, resource_code, content)
+        await write_sdlc_yml(tier, resource_code, github_org, content)
         log.info(json.dumps({
             "event":         "sdlc_yml_saved",
             "resource_code": resource_code,
-            "path":          f"configs/{resource_code}/sdlc.yml",
+            "path":          f"sdlc/{resource_code}/{github_org}/sdlc.yml",
         }))
 
     else:
