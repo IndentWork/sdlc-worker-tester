@@ -52,6 +52,18 @@ jobs:
           docker push "$IMAGE"
           echo "IMAGE=$IMAGE" >> $GITHUB_ENV
 
+      - name: Configure ACR registry auth on Container App
+        run: |
+          SHARED_MI_ID=$(az identity show \
+            --name "id-sdlc-shared-${{ env.ENV_LOWER }}" \
+            --resource-group "rg-sdlc-shared-${{ env.ENV_LOWER }}" \
+            --query id -o tsv)
+          az containerapp registry set \
+            --name "ca-sdlc-tester-${{ env.ENV_LOWER }}" \
+            --resource-group "rg-sdlc-base-${{ env.ENV_LOWER }}" \
+            --server "${{ env.ACR_SERVER }}" \
+            --identity "$SHARED_MI_ID"
+
       - name: Deploy to Container App
         run: |
           az containerapp update \
